@@ -1,0 +1,31 @@
+STAR version=2.7.10b
+STAR compilation time,server,dir=2023-02-07T10:07:54-0500 scc-bd6:/share/pkg.7/star/2.7.10b/src/STAR-2.7.10b/source
+STAR git: 
+##### Command Line:
+STAR --genomeDir star_index --runMode genomeGenerate --genomeFastaFiles project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa --sjdbGTFfile project-2-rnaseq/refs/gencode.v45.primary_assembly.annotation.gtf
+##### Initial USER parameters from Command Line:
+###### All USER parameters from Command Line:
+genomeDir                     star_index     ~RE-DEFINED
+runMode                       genomeGenerate        ~RE-DEFINED
+genomeFastaFiles              project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa        ~RE-DEFINED
+sjdbGTFfile                   project-2-rnaseq/refs/gencode.v45.primary_assembly.annotation.gtf     ~RE-DEFINED
+##### Finished reading parameters from all sources
+
+##### Final user re-defined parameters-----------------:
+runMode                           genomeGenerate   
+genomeDir                         star_index
+genomeFastaFiles                  project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa   
+sjdbGTFfile                       project-2-rnaseq/refs/gencode.v45.primary_assembly.annotation.gtf
+
+-------------------------------
+##### Final effective command line:
+STAR   --runMode genomeGenerate      --genomeDir star_index   --genomeFastaFiles project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa      --sjdbGTFfile project-2-rnaseq/refs/gencode.v45.primary_assembly.annotation.gtf
+----------------------------------------
+
+Number of fastq files for each mate = 1
+ParametersSolo: --soloCellFilterType CellRanger2.2 filtering parameters:  3000 0.99 10
+Finished loading and checking parameters
+--genomeDir directory exists and will be overwritten: star_index/
+Oct 11 20:19:37 ... starting to generate Genome files
+project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa : chr # 0  "chr1" chrStart: 0
+project-2-rnaseq/refs/GRCh38.primary_assembly.genome.fa : chr # 1  "chr2" chrStart: 249036800

@@ -1,0 +1,289 @@
+```{r}
+library(DESeq2)
+library(tidyverse)
+
+BiocManager::install('EnhancedVolcano')
+library(EnhancedVolcano)
+
+library(fgsea)
+
+BiocManager::install("vsn")
+library("vsn")
+
+library("RColorBrewer")
+
+install.packages("enrichR")
+library(enrichR)
+
+library(ggplot2)
+```
+
+```{r}
+#Create read count matrix cts
+df <- read.csv("results/verse_summary.csv", sep = "\t", row.names="gene")
+cts = as.matrix(df)
+head(cts,10)
+```
+
+
+```{r}
+# Filtering: Keep genes with at least 50 reads summed across all samples
+keep <- rowSums(cts) >= 50
+cts_filtered <- cts[keep, ]
+
+# Get counts before and after filtering
+counts <- c(nrow(cts), nrow(cts_filtered))
+
+cat("Number of genes before filtering:", counts[1], "\n")
+cat("Number of genes after filtering :", counts[2], "\n")
+
+# Plot filtering result
+bp <- barplot(counts,
+              names.arg = c("Before Filtering", "After Filtering"),
+              ylab = "Gene count",
+              col = c("lightblue", "salmon"),
+              ylim = c(0, max(counts) * 1.2)) # Increase y-lim for labels
+
+# Add gene counts above columns
+text(x = bp, y = counts, 
+     labels = counts, 
+     pos = 3, cex = 1.2, font = 2)
+```
+
+```{r}
+#Coldata describes exp and control conditions
+coldata = data.frame(condition = colnames(df))
+rownames(coldata) <- coldata$condition
+coldata$condition <- sapply(coldata$condition, function(x) strsplit(x, "_")[[1]][1])
+coldata
+```
+
+```{r}
+#Use the filtered counts for DESeq2
+dds <- DESeqDataSetFromMatrix(countData = cts_filtered, colData = coldata, design = ~ condition)
+```
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = cts_filtered, colData = coldata, design = ~ condition)
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("condition", "exp", "control"))
+
+#order data according to padj values
+resOrdered <- res[order(res$padj),]
+deseq2_res <- as.data.frame(resOrdered)
+deseq2_res$gene <- rownames(deseq2_res)
+deseq2_res
+```
+
+
+```{r}
+```
+
+```{r}
+ids <- read_tsv("results/humanID_genename.txt", skip = 1, col_names=c('gene', 'symbol'))
+deseq2_res <- deseq2_res %>% left_join(ids) %>% relocate(symbol)
+deseq2_res
+```
+
+```{r}
+#Threshold for significance (as per paper: FDR < 0.01):
+sig_genes <- subset(deseq2_res, padj < 0.01)
+
+# Sort by adjusted p-value (smallest first)
+sig_genes_sorted <- sig_genes[order(sig_genes$padj), ]
+
+# Select top 10 genes
+top10_genes <- head(sig_genes_sorted, 10)
+
+# Option 1: If gene names are in rownames
+top10_genes_table <- data.frame(
+  gene = rownames(top10_genes),
+  log2FoldChange = top10_genes$log2FoldChange,
+  lfcSE = top10_genes$lfcSE,
+  stat = top10_genes$stat,
+  pvalue = top10_genes$pvalue,
+  padj = top10_genes$padj
+)
+```
+
+```{r}
+# Write lists for up/down regulated genes
+up_genes <- sig_genes %>% filter(log2FoldChange > 0) %>% select(symbol)
+down_genes <- sig_genes %>% filter(log2FoldChange < 0) %>% select(symbol)
+write.table(up_genes, "pos_genes.txt", quote = FALSE, row.names = FALSE, col.names = FALSE)
+write.table(down_genes, "neg_genes.txt", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+```{r, fig.height=8}
+#Volcano Plot
+EnhancedVolcano(deseq2_res_ordered,
+    lab = deseq2_res_ordered$symbol,
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    title = 'S5',
+    ylim = c(0, -log10(10e-18)),
+    
+)
+```
+
+
+```{r}
+# Drop NA, distinct gene symbols
+deseq2_res_ordered <- deseq2_res %>% 
+  drop_na() %>% 
+  distinct(symbol, .keep_all = TRUE) %>%
+  arrange(desc(log2FoldChange))
+
+# Ranked list: log2FC named by symbol
+rnk_list <- setNames(deseq2_res_ordered$log2FoldChange, deseq2_res_ordered$symbol)
+head(rnk_list, 10)
+```
+```{r}
+#GSEA using Reactome Pathways
+#Use C2 canonical pathways MSIGDB dataset 
+pathways <- gmtPathways("rnotebooks/c2.cp.v2025.1.Hs.symbols.gmt")
+head(pathways)
+```
+```{r}
+# FGSEA
+fgseaRes <- fgsea(pathways=pathways, stats=rnk_list, minSize=15, maxSize=500)
+# Padj
+fgseaRes$padj <- p.adjust(fgseaRes$pval, method='BH')
+```
+
+```{r, fig.height = 8}
+# Pick top N most significant pathways (by padj)
+top_fgsea <- fgseaRes %>%
+  arrange(padj) %>%
+  slice_head(n = 10)  
+
+# Add a column for direction
+top_fgsea <- top_fgsea %>%
+  mutate(Direction = ifelse(NES > 0, "Up-regulated", "Down-regulated"))
+
+ggplot(top_fgsea, aes(x = reorder(pathway, NES), y = NES, fill = Direction)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top GSEA Pathways",
+    x = "Pathway",
+    y = "Normalized Enrichment Score (NES)"
+  ) +
+  scale_fill_manual(values = c("Up-regulated" = "firebrick", "Down-regulated" = "steelblue")) +
+  theme_bw()
+```
+
+```{r}
+#Plotting Top Pathways Table
+topPathwaysUp <- fgseaRes[ES > 0][head(order(pval), n=10), pathway]
+plotGseaTable(pathways[topPathwaysUp], rnk_list, fgseaRes, gseaParam=0.5)
+topPathwaysDown <- fgseaRes[ES < 0][head(order(pval), n=10), pathway]
+plotGseaTable(pathways[topPathwaysDown], rnk_list, fgseaRes, gseaParam=0.5)
+```
+
+
+```{r}
+plotEnrichment(pathways[["REACTOME_CELL_CYCLE_CHECKPOINTS"]],
+               rnk_list) + labs(title="REACTOME_CELL_CYCLE_CHECKPOINTS")
+
+```
+
+
+#RNAseq Quality Control 
+
+```{r}
+#according to chatGPT, vst is more common for large data
+vsd <- vst(dds, blind=FALSE) 
+
+#Generate Normalized Counts Matrix
+normalized_counts <- assay(vsd)
+head(normalized_counts)
+```
+
+```{r}
+#Quality Control Visualization: Mean-SD Plot
+meanSdPlot(normalized_counts)
+```
+
+
+```{r, fig.height= 8}
+#PCA Plot: Overlay Sample Information
+plotPCA(vsd, intgroup=c("condition"))
+```
+
+
+```{r, fig.height=8}
+#sample-sample distance heatmap
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- coldata$condition
+colnames(sampleDistMatrix) <- coldata$condition
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors, 
+         main = "Sample-to-Sample Distances")
+```
+
+#ENRICHR FOR ENRICHMENT ANALYSIS
+```{r}
+
+dbs <- enrichR::listEnrichrDbs()
+grep("Reactome", dbs$libraryName, value = TRUE)
+
+# Choose the correct Reactome library 
+reactome_db <- "Reactome_2022"
+
+#set up- and down-regulated genes
+enrich_up <- enrichr(up_genes, reactome_db)
+enrich_down <- enrichr(down_genes, reactome_db)
+
+up_results <- enrich_up[[reactome_db]]
+down_results <- enrich_down[[reactome_db]]
+
+get_pct <- function(overlap) {
+  vals <- strsplit(overlap, "/")[[1]]
+  pct <- as.numeric(vals[1]) / as.numeric(vals[2]) * 100
+  return(pct)
+}
+
+up_results$Percentage <- sapply(up_results$Overlap, get_pct)
+down_results$Percentage <- sapply(down_results$Overlap, get_pct)
+
+n_terms <- 5 # or 10
+
+top_up <- up_results %>% arrange(Adjusted.P.value) %>% head(n_terms)
+top_down <- down_results %>% arrange(Adjusted.P.value) %>% head(n_terms)
+
+top_up$Direction <- "Up-regulated"
+top_down$Direction <- "Down-regulated"
+plot_df <- dplyr::bind_rows(top_up, top_down)
+```
+```{r}
+plot_df
+```
+
+
+#Simulate data for Figure 3F
+```{r, fig.height=8}
+plot_df$Term <- factor(plot_df$Term, levels=rev(plot_df$Term))
+
+ggplot(plot_df, aes(x=Term, y=Percentage, fill=Direction)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = signif(Adjusted.P.value, 2)),    # Show FDR as label (rounded for clarity)
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  theme_bw() +
+  labs(
+    title = "Reactome Pathways: % DE Genes and FDR",
+    x = "Reactome Pathway",
+    y = "% DE Genes"
+  ) +
+  scale_fill_manual(values = c("Up-regulated" = "firebrick", "Down-regulated" = "steelblue"))
+
+```
+
+
+```{r}
+
+```

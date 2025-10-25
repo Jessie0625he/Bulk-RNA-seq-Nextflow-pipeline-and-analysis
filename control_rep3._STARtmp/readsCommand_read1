@@ -1,0 +1,3 @@
+exec > "control_rep3._STARtmp/tmp.fifo.read1"
+echo FILE 0
+zcat      "project-2-rnaseq/subsampled_files/control_rep3_R1.subset.fastq.gz"
