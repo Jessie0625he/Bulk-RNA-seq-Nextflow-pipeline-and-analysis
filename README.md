@@ -132,6 +132,7 @@ Key parameters are defined in nextflow.config, including:
 - Paired-end FASTQ files (R1, R2) from params.reads
 - Reference genome FASTA (params.genome)
 - Reference annotation GTF (params.gtf)
+
 **Outputs**
 - FastQC HTML/ZIP reports
 - STAR genome index directory
@@ -140,17 +141,17 @@ Key parameters are defined in nextflow.config, including:
 - VERSE *.exon.txt per-sample count outputs
 - Combined count matrix from parsed VERSE outputs
 - Gene ID ↔ gene symbol mapping file from GTF parsing
+  
 **Downstream Analysis**
 Downstream RNA-seq analysis and figures are in Results_Analysis/, including:
-
 - filtering and normalization outputs
 - PCA plot
 - sample-to-sample distance heatmap
 - differential expression summaries
 - volcano plot
 - enrichment analysis (Enrichr / Reactome / FGSEA)
+  
 **Primary notebook/report files:**
-
 - Results_Analysis/analysis.Rmd
 - Project2_Report_XJ_1b.ipynb
 - Project 2_Report.pdf
