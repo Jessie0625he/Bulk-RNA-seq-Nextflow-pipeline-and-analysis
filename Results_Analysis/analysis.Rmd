@@ -65,7 +65,7 @@ dds <- DESeqDataSetFromMatrix(countData = cts_filtered, colData = coldata, desig
 
 
 ```{r}
-dds <- DESeqDataSetFromMatrix(countData = cts_filtered, colData = coldata, design = ~ condition)
+
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("condition", "exp", "control"))
 
@@ -74,10 +74,6 @@ resOrdered <- res[order(res$padj),]
 deseq2_res <- as.data.frame(resOrdered)
 deseq2_res$gene <- rownames(deseq2_res)
 deseq2_res
-```
-
-
-```{r}
 ```
 
 ```{r}
@@ -92,11 +88,16 @@ sig_genes <- subset(deseq2_res, padj < 0.01)
 
 # Sort by adjusted p-value (smallest first)
 sig_genes_sorted <- sig_genes[order(sig_genes$padj), ]
+sig_genes_sorted
+write.table(sig_genes, "sig_genes.txt", quote = FALSE, row.names = TRUE, col.names = TRUE)
+```
 
+
+```{r}
 # Select top 10 genes
 top10_genes <- head(sig_genes_sorted, 10)
 
-# Option 1: If gene names are in rownames
+#print out the top10 gene table
 top10_genes_table <- data.frame(
   gene = rownames(top10_genes),
   log2FoldChange = top10_genes$log2FoldChange,
@@ -105,6 +106,10 @@ top10_genes_table <- data.frame(
   pvalue = top10_genes$pvalue,
   padj = top10_genes$padj
 )
+write.table(top10_genes, "top10_genes.txt", quote = FALSE, row.names = TRUE, col.names = TRUE)
+```
+```{r}
+top10_genes
 ```
 
 ```{r}
